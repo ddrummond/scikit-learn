@@ -44,7 +44,7 @@ from sklearn import datasets
 from sklearn.utils import compute_sample_weight
 
 CLF_CRITERIONS = ("gini", "entropy")
-REG_CRITERIONS = ("mse", "mae", "friedman_mse")
+REG_CRITERIONS = ("mse", "mae", "friedman_mse", "signmse")
 
 CLF_TREES = {
     "DecisionTreeClassifier": DecisionTreeClassifier,
@@ -216,6 +216,19 @@ def test_regression_toy():
                             err_msg="Failed with {0}".format(name))
 
         clf = Tree(max_features=1, random_state=1)
+        clf.fit(X, y)
+        assert_almost_equal(reg.predict(T), true_result,
+                            err_msg="Failed with {0}".format(name))
+
+def test_signregression_toy():
+    # Check regression on a toy dataset.
+    for name, Tree in REG_TREES.items():
+        reg = Tree(criterion="signmse", random_state=1)
+        reg.fit(X, y)
+        assert_almost_equal(reg.predict(T), true_result,
+                            err_msg="Failed with {0}".format(name))
+
+        clf = Tree(criterion="signmse", max_features=1, random_state=1)
         clf.fit(X, y)
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))

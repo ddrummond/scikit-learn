@@ -676,6 +676,396 @@ cdef class Gini(ClassificationCriterion):
         impurity_left[0] = gini_left / self.n_outputs
         impurity_right[0] = gini_right / self.n_outputs
 
+cdef class SignRegressionCriterion(Criterion):
+    r"""Abstract regression criterion.
+
+    This handles cases where the target is a continuous value, and is
+    evaluated by computing the sign-biased variance of the target values left and right
+    of the split point. The computation takes linear time with `n_samples`
+    by using ::
+
+        biasedSign = if (count(y) | y > 0) > (count(y) | y < 0)) 1 else -1
+
+        y_bar = \sum_i^n (y_i | sign(y_i) == biasedSign ) / n_samples
+
+        var = \sum_i^n (y_i - y_bar) ** 2
+            = (\sum_i^n y_i ** 2) - n_samples * y_bar ** 2
+    """
+
+    def __cinit__(self, SIZE_t n_outputs, SIZE_t n_samples):
+        """Initialize parameters for this criterion.
+
+        Parameters
+        ----------
+        n_outputs : SIZE_t
+            The number of targets to be predicted
+
+        n_samples : SIZE_t
+            The total number of samples to fit on
+        """
+
+        # Default values
+        self.sample_weight = NULL
+
+        self.samples = NULL
+        self.start = 0
+        self.pos = 0
+        self.end = 0
+
+        if n_outputs > 1:
+            raise ValueError("SignRegressionCriterion only supports a single output dimension today.")
+
+        self.n_outputs = n_outputs
+        self.n_samples = n_samples
+        self.n_node_samples = 0
+
+        #Weights will now store the weighted total for either the positive or negative samples
+        self.weighted_n_node_samples = 0.0
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = 0.0
+
+        self.sq_sum_total = 0.0
+
+        # Allocate accumulators. Make sure they are NULL, not uninitialized,
+        # before an exception can be raised (which triggers __dealloc__).
+        self.sum_total = NULL
+        self.sum_left = NULL
+        self.sum_right = NULL
+        self.signCount_total = NULL
+        self.signWeighted_n_node_samples = NULL
+        self.signCount_left = NULL
+        self.signCount_right = NULL
+
+        # Allocate memory for the accumulators
+        self.sum_total = <double*> calloc(n_outputs, sizeof(double))
+        self.sum_left = <double*> calloc(n_outputs, sizeof(double))
+        self.sum_right = <double*> calloc(n_outputs, sizeof(double))
+        self.signCount_total = <int*> calloc(n_outputs, sizeof(int))
+        self.signWeighted_n_node_samples = <double*> calloc(n_outputs, sizeof(double))
+        self.signCount_left = <int*> calloc(n_outputs, sizeof(int))
+        self.signCount_right = <int*> calloc(n_outputs, sizeof(int))
+
+        if (self.sum_total == NULL or
+                self.sum_left == NULL or
+                self.sum_right == NULL or
+                self.signCount_total == NULL or
+                self.signWeighted_n_node_samples == NULL or
+                self.signCount_left == NULL or
+                self.signCount_right == NULL):
+            raise MemoryError()
+
+    def __dealloc__(self):
+        """Destructor."""
+        #self.super().__dealloc__()  #shouldn't I need to do this?
+        free(self.signCount_total)
+        free(self.signWeighted_n_node_samples)
+        free(self.signCount_left)
+        free(self.signCount_right)
+
+    def __reduce__(self):
+        return (type(self), (self.n_outputs, self.n_samples), self.__getstate__())
+
+    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
+                  double weighted_n_samples, SIZE_t* samples, SIZE_t start,
+                  SIZE_t end) nogil except -1:
+        """Initialize the criterion at node samples[start:end] and
+           children samples[start:start] and samples[start:end]."""
+        # Initialize fields
+        self.y = y
+        self.sample_weight = sample_weight
+        self.samples = samples
+        self.start = start
+        self.end = end
+        self.n_node_samples = end - start
+        self.weighted_n_samples = weighted_n_samples
+        self.weighted_n_node_samples = 0.
+        #Variables recording the chosen sign-bias of the central tendency measure (mean, median) used in the variance calculation
+        #Values can be: -1 = Central tendency only uses Negative numbers, 0 = Central tendency uses both Negative and Positive Numbers, 1 = Central Tendency uses only positive numbers
+        self.sign_total = 0
+        self.sign_left = 0
+        self.sign_right = 0
+
+        cdef SIZE_t i
+        cdef SIZE_t p
+        cdef SIZE_t k
+        cdef DOUBLE_t y_ik
+        cdef DOUBLE_t w_y_ik
+        cdef DOUBLE_t w = 1.0
+
+        self.sq_sum_total = 0.0
+        memset(self.sum_total, 0, self.n_outputs * sizeof(double))
+        memset(self.signCount_total, 0, self.n_outputs * sizeof(int))
+        memset(self.signWeighted_n_node_samples, 0, self.n_outputs * sizeof(double))
+
+        #Inspect y values first to determine which direction to set the bias
+        for p in range(start, end):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                w_y_ik = w * y_ik
+                if w_y_ik > 0.0:
+                    self.signCount_total[k] += 1
+                elif w_y_ik < 0.0:
+                    self.signCount_total[k] -= 1
+
+        for p in range(start, end):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                w_y_ik = w * y_ik
+
+                if self.signCount_total[k] > 0 and w_y_ik > 0.0:
+                    self.sum_total[k] += w_y_ik
+                    self.signWeighted_n_node_samples[k] += w
+                elif self.signCount_total[k] < 0 and w_y_ik < 0.0:
+                    self.sum_total[k] += w_y_ik
+                    self.signWeighted_n_node_samples[k] += w
+                elif self.signCount_total[k] == 0:
+                    self.sum_total[k] += w_y_ik
+                    self.signWeighted_n_node_samples[k] += w
+
+                self.sq_sum_total += w_y_ik * y_ik
+
+            #NOTE: Since we are conditionally setting the dimensional weighted total based on the dominant dimensional sign
+            #      this means that each y dimension has its own weight total that should be used for computing central tendency
+            #TODO: replace use of weighted_n_node_samples with signWeighted_n_node_samples[k], until then just use the first dimension's weights.
+            # Until this is done we can only support single-dimension problems.
+            self.weighted_n_node_samples += w
+            #self.weighted_n_node_samples += self.signWeighted_n_node_samples[0]
+
+        # Reset to pos=start
+        self.reset()
+        return 0
+
+    cdef int reset(self) nogil except -1:
+        """Reset the criterion at pos=start."""
+        cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
+        memset(self.sum_left, 0, n_bytes)
+        memcpy(self.sum_right, self.sum_total, n_bytes)
+
+        memset(self.signCount_left, 0, self.n_outputs * sizeof(int))
+        #TODO: determine if I really want to start an iteration with right signCount set to total.  I think so.
+        memcpy(self.signCount_right self.signCount_total, self.n_outputs * sizeof(int))
+
+        #TODO: convert weighted_n_left and weighted_n_right to signweighted_n_right
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = self.signWeighted_n_node_samples[0]
+        #self.weighted_n_right = self.weighted_n_node_samples
+        self.pos = self.start
+        return 0
+
+    cdef int reverse_reset(self) nogil except -1:
+        """Reset the criterion at pos=end."""
+        cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
+        memset(self.sum_right, 0, n_bytes)
+        memcpy(self.sum_left, self.sum_total, n_bytes)
+
+        memset(self.signCount_right, 0, self.n_outputs * sizeof(int))
+        #TODO: determine if I really want to reverse an iteration with left signCount set to total.  I think so.
+        memcpy(self.signCount_left self.signCount_total, self.n_outputs * sizeof(int))
+
+        #TODO: Convert weighted_n_right and weighted_n_left to signed versions
+
+        self.weighted_n_right = 0.0
+        #self.weighted_n_left = self.weighted_n_node_samples
+        self.weighted_n_left = self.signWeighted_n_node_samples[0]
+        self.pos = self.end
+        return 0
+
+    cdef int update(self, SIZE_t new_pos) nogil except -1:
+        """Updated statistics by moving samples[pos:new_pos] to the left."""
+
+        cdef double* sum_left = self.sum_left
+        cdef double* sum_right = self.sum_right
+        cdef double* sum_total = self.sum_total
+
+        cdef double* sample_weight = self.sample_weight
+        cdef SIZE_t* samples = self.samples
+
+        cdef SIZE_t pos = self.pos
+        cdef SIZE_t end = self.end
+        cdef SIZE_t start = self.start
+        cdef SIZE_t i
+        cdef SIZE_t p
+        cdef SIZE_t k
+        cdef DOUBLE_t w = 1.0
+        cdef DOUBLE_t y_ik = 0.0
+        cdef DOUBLE_t w_y_ik = 0.0
+
+        #Reset the Left and Right sign Count cumulators
+        for k in range(self.n_outputs):
+            self.signCount_Left[k] = 0
+            self.signCount_Right[k] = 0
+
+        #Update the Left Sign Count cumulator
+        for p in range(start, new_pos):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                w_y_ik = w * y_ik
+                if w_y_ik > 0.0:
+                    self.signCount_Left[k] += 1
+                elif w_y_ik < 0.0:
+                    self.signCount_Left[k] -= 1
+
+        #Update the Left cumulator, use the dominant sign to filter the weighted samples by sign
+        for p in range(start, new_pos):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                w_y_ik = w * y_ik
+
+                if self.signCount_Left[k] > 0 and w_y_ik > 0.0:
+                    self.sum_left[k] += w_y_ik
+                    self.weighted_n_left += w
+                elif self.signCount_Left[k] < 0 and w_y_ik < 0.0:
+                    self.sum_left[k] += w_y_ik
+                    self.weighted_n_left += w
+                elif self.signCount_Left[k] == 0:
+                    self.sum_left[k] += w_y_ik
+                    self.weighted_n_left += w
+
+        #Update the Right Sign Count cumulator
+        for p in range(new_pos, end):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                w_y_ik = w * y_ik
+                if w_y_ik > 0.0:
+                    self.signCount_Right[k] += 1
+                elif w_y_ik < 0.0:
+                    self.signCount_Right[k] -= 1
+
+        #Update the Right cumulator, use the dominant sign to filter the weighted samples by sign
+        for p in range(new_pos, end):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                w_y_ik = w * y_ik
+
+                if self.signCount_Right[k] > 0 and w_y_ik > 0.0:
+                    self.sum_Right[k] += w_y_ik
+                    self.weighted_n_Right += w
+                elif self.signCount_Right[k] < 0 and w_y_ik < 0.0:
+                    self.sum_Right[k] += w_y_ik
+                    self.weighted_n_Right += w
+                elif self.signCount_Right[k] == 0:
+                    self.sum_Right[k] += w_y_ik
+                    self.weighted_n_Right += w
+
+        self.pos = new_pos
+        return 0
+
+    cdef double node_impurity(self) nogil:
+        pass
+
+    cdef void children_impurity(self, double* impurity_left,
+                                double* impurity_right) nogil:
+        pass
+
+    cdef void node_value(self, double* dest) nogil:
+        """Compute the node value of samples[start:end] into dest."""
+
+        cdef SIZE_t k
+
+        for k in range(self.n_outputs):
+            dest[k] = self.sum_total[k] / self.signWeighted_n_node_samples[k]
+
+
+cdef class SignMSE(SignRegressionCriterion):
+    """Sign-biased Mean squared error impurity criterion.
+
+        SMSE = sign_biased_var_left + sign_biased_var_right
+    """
+
+    cdef double node_impurity(self) nogil:
+        """Evaluate the impurity of the current node, i.e. the impurity of
+           samples[start:end]."""
+
+        cdef double* sum_total = self.sum_total
+        cdef double impurity
+        cdef SIZE_t k
+        impurity = self.sq_sum_total / self.weighted_n_node_samples
+        for k in range(self.n_outputs):
+            impurity -= (sum_total[k] / self.signWeighted_n_node_samples[k])**2.0
+
+        return impurity / self.n_outputs
+
+
+    cdef void children_impurity(self, double* impurity_left,
+                                double* impurity_right) nogil:
+        """Evaluate the impurity in children nodes, i.e. the impurity of the
+           left child (samples[start:pos]) and the impurity the right child
+           (samples[pos:end])."""
+
+        cdef DOUBLE_t* sample_weight = self.sample_weight
+        cdef SIZE_t* samples = self.samples
+        cdef SIZE_t pos = self.pos
+        cdef SIZE_t start = self.start
+
+        cdef double* sum_left = self.sum_left
+        cdef double* sum_right = self.sum_right
+        cdef DOUBLE_t y_ik
+
+        cdef double sq_sum_left = 0.0
+        cdef double sq_sum_right
+
+        cdef SIZE_t i
+        cdef SIZE_t p
+        cdef SIZE_t k
+        cdef DOUBLE_t w = 1.0
+        cdef DOUBLE_t sum_weighted_n_left = 0.0
+        cdef DOUBLE_t sum_weighted_n_right = 0.0
+
+        for p in range(start, pos):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                w = sample_weight[i]
+
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
+                sq_sum_left += w * y_ik * y_ik
+
+            sum_weighted_n_left += w
+
+        sq_sum_right = self.sq_sum_total - sq_sum_left
+        sum_weighted_n_right = self.weighted_n_node_samples - sum_weighted_n_left
+
+        impurity_left[0] = sq_sum_left / sum_weighted_n_left
+        impurity_right[0] = sq_sum_right / sum_weighted_n_right
+
+        for k in range(self.n_outputs):
+            impurity_left[0] -= (sum_left[k] / self.weighted_n_left) ** 2.0
+            impurity_right[0] -= (sum_right[k] / self.weighted_n_right) ** 2.0
+
+        impurity_left[0] /= self.n_outputs
+        impurity_right[0] /= self.n_outputs
+
 
 cdef class RegressionCriterion(Criterion):
     r"""Abstract regression criterion.

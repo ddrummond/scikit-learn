@@ -75,3 +75,11 @@ cdef class RegressionCriterion(Criterion):
     """Abstract regression criterion."""
 
     cdef double sq_sum_total
+
+cdef class SignRegressionCriterion(Criterion):
+    """Abstract regression criterion."""
+
+    cdef double sq_sum_total
+
+
+
