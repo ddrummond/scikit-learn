@@ -34,6 +34,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.tree import ExtraTreeClassifier
 from sklearn.tree import ExtraTreeRegressor
+from sklearn.tree import export_text
 
 from sklearn import tree
 from sklearn.tree._tree import TREE_LEAF, TREE_UNDEFINED
@@ -99,6 +100,48 @@ X = [[-2, -1], [-1, -1], [-1, -2], [1, 1], [1, 2], [2, 1]]
 y = [-1, -1, -1, 1, 1, 1]
 T = [[-1, -1], [2, 2], [3, 2]]
 true_result = [-1, 1, 1]
+
+# signmse calibrated dataset
+X_signmse_calibrated = np.array([
+     [-0.9762676462],
+     [-0.8200600004],
+     [-0.7225356515],
+     [-0.5733112921],
+     [-0.4915537654],
+     [-0.4796330164],
+     [-0.3223676069],
+     [-0.3179574601],
+     [-0.2883424724],
+     [-0.2665586278],
+     [-0.08995920349],
+     [0.003988758177],
+     [0.0715460541],
+     [0.1271927842],
+     [0.1402935243],
+     [0.4450264654],
+     [0.5261974719],
+     [0.8081540626],
+     [0.8514871069]])
+
+y_signmse_calibrated = [-0.9762676462, 
+                        -0.8200600004, 
+                        -0.7225356515, 
+                        -0.5733112921, 
+                        -0.4915537654, 
+                        -0.4796330164, 
+                        -0.3223676069, 
+                        -0.3179574601, 
+                        -0.2883424724, 
+                        -0.2665586278, 
+                        -0.08995920349, 
+                        0.003988758177, 
+                        0.0715460541, 
+                        0.1271927842, 
+                        0.1402935243, 
+                        0.4450264654, 
+                        0.5261974719, 
+                        0.8081540626, 
+                        0.8514871069]
 
 # also load the iris dataset
 # and randomly permute it
@@ -212,6 +255,12 @@ def test_regression_toy():
     for name, Tree in REG_TREES.items():
         reg = Tree(random_state=1)
         reg.fit(X, y)
+        r = export_text(reg)
+        print("=======================================")
+        print("MSE {} Tree".format(name))
+        print("---------------------------------------")
+        print(r)
+        print("=======================================")
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
 
@@ -222,9 +271,15 @@ def test_regression_toy():
 
 def test_signregression_toy():
     # Check regression on a toy dataset.
-    for name, Tree in REG_TREES.items():
+    for name, Tree in [("DecisionTreeRegressor", DecisionTreeRegressor)]:
         reg = Tree(criterion="signmse", random_state=1)
         reg.fit(X, y)
+        r = export_text(reg)
+        print("=======================================")
+        print("SignMSE {} Tree".format(name))
+        print("---------------------------------------")
+        print(r)
+        print("=======================================")
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
 
@@ -232,6 +287,83 @@ def test_signregression_toy():
         clf.fit(X, y)
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
+
+def test_signregression_calibrated_split():
+
+    expectedSignForecasts = [-0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             -0.4862315221,
+                             0.3717357784,
+                             0.3717357784,
+                             0.3717357784,
+                             0.3717357784,
+                             0.3717357784,
+                             0.3717357784,
+                             0.3717357784,
+                             0.3717357784]
+
+    expectedMSEForecasts = [-0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            -0.3337017081,
+                            0.6577162767,
+                            0.6577162767,
+                            0.6577162767,
+                            0.6577162767]
+
+    #Note the expected answers were computed using a spreadsheet based on the DecisionTreeRegressor logic.
+    # The ExtraTreeRegressor tree uses totally random splits, so its not a good choice to test the underlying Criterion class
+    TEST_TREES = {
+        "DecisionTreeRegressor": DecisionTreeRegressor
+    }
+    # Confirm that I understand the standard MSE decision tree logic as well.
+    regMSE = DecisionTreeRegressor(criterion="mse", random_state=1, max_depth=5)
+    regMSE.fit(X_signmse_calibrated, y_signmse_calibrated)
+    r = export_text(regMSE, show_weights=True)
+    print("=======================================")
+    print("MSE Tree")
+    print("---------------------------------------")
+    print(r)
+    print("=======================================")
+    #assert_almost_equal(regMSE.predict(X_signmse_calibrated), expectedMSEForecasts,
+    #                    err_msg="Tree DecisionTreeRegressor with criterion='mse' failed to match expected result.")
+
+    # Check regression on a calibrated dataset.
+    for name, Tree in TEST_TREES.items():
+        reg = Tree(criterion="signmse", random_state=1, max_depth=5)
+        reg.fit(X_signmse_calibrated, y_signmse_calibrated)
+        r = export_text(reg, show_weights=True)
+        print("=======================================")
+        print("SignMSE {} Tree".format(name))
+        print("---------------------------------------")
+        print(r)
+        print("=======================================")
+        #assert_almost_equal(reg.predict(X_signmse_calibrated), expectedSignForecasts,
+        #                    err_msg="Tree {0} with criterion='signmse' failed to match expected result.".format(name))
+        #fail if this fit gives you teh same result as mse
+        if np.array_equal(reg.predict(X_signmse_calibrated), regMSE.predict(X_signmse_calibrated)):
+            pytest.fail("predictions for signmse and mse should not be the same.")
+
+
 
 
 def test_xor():
