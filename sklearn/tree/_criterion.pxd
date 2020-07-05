@@ -87,8 +87,8 @@ cdef class SignRegressionCriterion(Criterion):
     cdef int* signCount_right
     cdef double sgnd(self, double x) nogil except -999
     cdef double sq_sum_total
-    cdef int d
-    cdef int a
+    cdef double d
+    cdef double a
 
 
 
