@@ -81,10 +81,6 @@ cdef class SignRegressionCriterion(Criterion):
 
     cdef int* signCount_total
     cdef double* signWeighted_n_node_samples
-    cdef double* signWeightSum_n_node_samples_left
-    cdef double* signWeightSum_n_node_samples_right
-    cdef int* signCount_left
-    cdef int* signCount_right
     cdef double sgnd(self, double x) nogil except -999
     cdef double sq_sum_total
     cdef double d

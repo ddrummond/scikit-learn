@@ -738,10 +738,6 @@ cdef class SignRegressionCriterion(Criterion):
         self.sum_right = NULL
         self.signCount_total = NULL
         self.signWeighted_n_node_samples = NULL
-        self.signCount_left = NULL
-        self.signCount_right = NULL
-        self.signWeightSum_n_node_samples_left = NULL
-        self.signWeightSum_n_node_samples_right = NULL
 
         # Allocate memory for the accumulators
         self.sum_total = <double*> calloc(n_outputs, sizeof(double))
@@ -749,20 +745,12 @@ cdef class SignRegressionCriterion(Criterion):
         self.sum_right = <double*> calloc(n_outputs, sizeof(double))
         self.signCount_total = <int*> calloc(n_outputs, sizeof(int))
         self.signWeighted_n_node_samples = <double*> calloc(n_outputs, sizeof(double))
-        self.signCount_left = <int*> calloc(n_outputs, sizeof(int))
-        self.signCount_right = <int*> calloc(n_outputs, sizeof(int))
-        self.signWeightSum_n_node_samples_left = <double*> calloc(n_outputs, sizeof(double))
-        self.signWeightSum_n_node_samples_right = <double*> calloc(n_outputs, sizeof(double))
 
         if (self.sum_total == NULL or
                 self.sum_left == NULL or
                 self.sum_right == NULL or
                 self.signCount_total == NULL or
-                self.signWeighted_n_node_samples == NULL or
-                self.signCount_left == NULL or
-                self.signCount_right == NULL or
-                self.signWeightSum_n_node_samples_left == NULL or
-                self.signWeightSum_n_node_samples_right == NULL):
+                self.signWeighted_n_node_samples == NULL):
             raise MemoryError()
 
     def __dealloc__(self):
@@ -770,10 +758,6 @@ cdef class SignRegressionCriterion(Criterion):
         # sum_total, sum_left, sum_right are handled by super.__dealloc__
         free(self.signCount_total)
         free(self.signWeighted_n_node_samples)
-        free(self.signCount_left)
-        free(self.signCount_right)
-        free(self.signWeightSum_n_node_samples_left)
-        free(self.signWeightSum_n_node_samples_right)
 
     def __reduce__(self):
         return (type(self), (self.n_outputs, self.n_samples), self.__getstate__())
@@ -806,29 +790,8 @@ cdef class SignRegressionCriterion(Criterion):
         memset(self.sum_total, 0, self.n_outputs * sizeof(double))
         memset(self.signCount_total, 0, self.n_outputs * sizeof(int))
         memset(self.signWeighted_n_node_samples, 0, self.n_outputs * sizeof(double))
-        memset(self.signCount_left, 0, self.n_outputs * sizeof(int))
-        memset(self.signCount_right, 0, self.n_outputs * sizeof(int))
-        memset(self.signWeightSum_n_node_samples_left, 0, self.n_outputs * sizeof(double))
-        memset(self.signWeightSum_n_node_samples_right, 0, self.n_outputs * sizeof(double))
 
-        #Inspect y values first to determine which direction to set the bias
-        #printf("SignRegressionCriterion.init(): testing start=%d, end=%d \n", start, end)
-        for p in range(start, end):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                w = sample_weight[i]
-
-            for k in range(self.n_outputs):
-                y_ik = self.y[i, k]
-                w_y_ik = w * y_ik
-                if w_y_ik > 0.0:
-                    self.signCount_total[k] += 1
-                elif w_y_ik < 0.0:
-                    self.signCount_total[k] -= 1
-                #printf("SignRegressionCriterion.init(): i=%d, signCount_total[0]=%d \n", i, self.signCount_total[0])
-
-        printf("SignRegressionCriterion.init(): start=%d, end=%d, signCount_total[0]=%d\n", start, end, self.signCount_total[0])
+        printf("SignRegressionCriterion.init(): start=%d, end=%d \n", start, end)
 
         for p in range(start, end):
             i = samples[p]
@@ -839,22 +802,9 @@ cdef class SignRegressionCriterion(Criterion):
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
                 w_y_ik = w * y_ik
-
-                if self.signCount_total[k] > 0 and w_y_ik > 0.0:
-                    self.sum_total[k] += w_y_ik
-                    self.signWeighted_n_node_samples[k] += w
-                elif self.signCount_total[k] < 0 and w_y_ik < 0.0:
-                    self.sum_total[k] += w_y_ik
-                    self.signWeighted_n_node_samples[k] += w
-                elif self.signCount_total[k] == 0:
-                    self.sum_total[k] += w_y_ik
-                    self.signWeighted_n_node_samples[k] += w
-
+                self.sum_total[k] += w_y_ik
                 self.sq_sum_total += w_y_ik * y_ik
 
-
-            #NOTE: Since we are conditionally setting the dimensional weighted total based on the dominant dimensional sign
-            #      this means that each y dimension has its own weight total that should be used for computing central tendency
             self.weighted_n_node_samples += w
 
         # Reset to pos=start
@@ -870,12 +820,6 @@ cdef class SignRegressionCriterion(Criterion):
         memset(self.sum_left, 0, n_bytes)
         memset(self.sum_right, 0, n_bytes)
 
-        memset(self.signCount_left, 0, self.n_outputs * sizeof(int))
-        memset(self.signCount_right, 0, self.n_outputs * sizeof(int))
-
-        memset(self.signWeightSum_n_node_samples_left, 0, n_bytes)
-        memset(self.signWeightSum_n_node_samples_right, 0, n_bytes)
-
         self.weighted_n_left = 0.0
         self.weighted_n_right = 0.0
         self.pos = self.start
@@ -888,12 +832,6 @@ cdef class SignRegressionCriterion(Criterion):
         cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
         memset(self.sum_right, 0, n_bytes)
         memset(self.sum_left, 0, n_bytes)
-
-        memset(self.signCount_right, 0, self.n_outputs * sizeof(int))
-        memset(self.signCount_left, 0, self.n_outputs * sizeof(int))
-
-        memset(self.signWeightSum_n_node_samples_left, 0, n_bytes)
-        memset(self.signWeightSum_n_node_samples_right, 0, n_bytes)
 
         self.weighted_n_right = 0.0
         self.weighted_n_left = 0.0
@@ -910,12 +848,8 @@ cdef class SignRegressionCriterion(Criterion):
         cdef double* sum_left = self.sum_left
         cdef double* sum_right = self.sum_right
         cdef double* sum_total = self.sum_total
-        cdef int* signCount_left = self.signCount_left
-        cdef int* signCount_right = self.signCount_right
 
         cdef double* sample_weight = self.sample_weight
-        cdef double* signWeightSum_n_node_samples_left = self.signWeightSum_n_node_samples_left
-        cdef double* signWeightSum_n_node_samples_right = self.signWeightSum_n_node_samples_right
         cdef SIZE_t* samples = self.samples
 
         cdef SIZE_t pos = self.pos
@@ -932,27 +866,8 @@ cdef class SignRegressionCriterion(Criterion):
         self.weighted_n_left = 0
         self.weighted_n_right = 0
         for k in range(self.n_outputs):
-            signCount_left[k] = 0
-            signCount_right[k] = 0
             sum_left[k] = 0
-            signWeightSum_n_node_samples_left[k] = 0
             sum_right[k] = 0
-            signWeightSum_n_node_samples_right[k] = 0
-
-        #Update the Left Sign Count cumulator
-        for p in range(start, new_pos):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                w = sample_weight[i]
-
-            for k in range(self.n_outputs):
-                y_ik = self.y[i, k]
-                w_y_ik = w * y_ik
-                if w_y_ik > 0.0:
-                    signCount_left[k] += 1
-                elif w_y_ik < 0.0:
-                    signCount_left[k] -= 1
 
         #Update the Left cumulator, use the dominant sign to filter the weighted samples by sign
         for p in range(start, new_pos):
@@ -964,31 +879,10 @@ cdef class SignRegressionCriterion(Criterion):
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
                 w_y_ik = w * y_ik
-
-                if signCount_left[k] > 0 and w_y_ik > 0.0:
-                    sum_left[k] += w_y_ik
-                    signWeightSum_n_node_samples_left[k] += w
-                elif signCount_left[k] <= 0 and w_y_ik < 0.0: #If there is a signcount tie, then make negative the winner
-                    sum_left[k] += w_y_ik
-                    signWeightSum_n_node_samples_left[k] += w
+                sum_left[k] += w_y_ik
 
             self.weighted_n_left += w
 
-
-        #Update the Right Sign Count cumulator
-        for p in range(new_pos, end):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                w = sample_weight[i]
-
-            for k in range(self.n_outputs):
-                y_ik = self.y[i, k]
-                w_y_ik = w * y_ik
-                if w_y_ik > 0.0:
-                    signCount_right[k] += 1
-                elif w_y_ik < 0.0:
-                    signCount_right[k] -= 1
 
         #Update the Right cumulator, use the dominant sign to filter the weighted samples by sign
         for p in range(new_pos, end):
@@ -1000,13 +894,7 @@ cdef class SignRegressionCriterion(Criterion):
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
                 w_y_ik = w * y_ik
-
-                if signCount_right[k] > 0 and w_y_ik > 0.0:
-                    sum_right[k] += w_y_ik
-                    signWeightSum_n_node_samples_right[k] += w
-                elif signCount_right[k] <= 0 and w_y_ik < 0.0:  #If there is a signcount tie, then make negative the winner
-                    sum_right[k] += w_y_ik
-                    signWeightSum_n_node_samples_right[k] += w
+                sum_right[k] += w_y_ik
 
             self.weighted_n_right += w
 
@@ -1027,7 +915,7 @@ cdef class SignRegressionCriterion(Criterion):
         cdef SIZE_t k
 
         for k in range(self.n_outputs):
-            dest[k] = self.sum_total[k] / self.signWeighted_n_node_samples[k]
+            dest[k] = self.sum_total[k] / self.weighted_n_node_samples
 
 
 cdef class SignMSE(SignRegressionCriterion):
@@ -1036,14 +924,14 @@ cdef class SignMSE(SignRegressionCriterion):
         SMSE = sign_biased_var_left + sign_biased_var_right
     """
 
-    cdef double computeLinexVariance(self, double* sign_weighted_ysum_array, double* sign_weighted_wsum_array, SIZE_t* samples, SIZE_t start, SIZE_t end) nogil:
+    cdef double computeLinexVariance(self, double* weighted_ysum_array, double* weight_sum_array, SIZE_t* samples, SIZE_t start, SIZE_t end) nogil:
         """Computes the LINEX-based variance of samples from start to end positions.
 
         Parameters
         ----------
-        sign_weighted_ysum_array : double*
+        weighted_ysum_array : double*
             pointer to the sign-specific sum of weighted y values, array indexed by output.  Used to compute the central tendency.
-        sign_weighted_wsum_array : double*
+        weight_sum_array : double*
             pointer to the sign-specific sum of weights, array indexed by output.  Used to compute the central tendency.
         samples : SIZE_t*
             pointer to the integer samples array
@@ -1053,7 +941,7 @@ cdef class SignMSE(SignRegressionCriterion):
             the ending index
 
         """
-        printf("SignMSE.computeLinexVariance(sign_weighted_ysum_array[0]=%.2f, sign_weighted_wsum_array[0]=%.2f, start=%d, end=%d)\n", sign_weighted_ysum_array[0], sign_weighted_wsum_array[0], start, end)
+        printf("SignMSE.computeLinexVariance(weighted_ysum_array[0]=%.2f, weight_sum_array[0]=%.2f, start=%d, end=%d)\n", weighted_ysum_array[0], weight_sum_array[0], start, end)
         cdef double* sample_weight = self.sample_weight
         cdef SIZE_t i
         cdef SIZE_t p
@@ -1073,7 +961,7 @@ cdef class SignMSE(SignRegressionCriterion):
         cdef double linearComponent = 0.0
 
         for k in range(self.n_outputs):
-            weightedYMean = sign_weighted_ysum_array[k] / sign_weighted_wsum_array[k]
+            weightedYMean = weighted_ysum_array[k] / weight_sum_array[k]
             linexResidualSum = 0.0
             sumOutputKSampleWeights = 0.0
             w = 1.0
@@ -1090,13 +978,12 @@ cdef class SignMSE(SignRegressionCriterion):
                 residual = w_y_ik - weightedYMean
 
                 linexResidual = exp(-self.d * fabs(residual) * self.sgnd(weightedYMean) * self.sgnd(w_y_ik)) + fabs(self.a * residual) - const_one
-                linearComponent = fabs(self.a * residual) - const_one
+                #linearComponent = fabs(self.a * residual) - const_one
                 #printf("linexResidual=%.6f, w_y_ik=%.6f, weightedYMean=%.6f, -self.d=%.6f, fabs(residual)=%.6f, self.sgnd(weightedYMean)=%.1f, self.sgnd(w_y_ik)=%.1f linearComponent=%.6f \n", linexResidual, w_y_ik, weightedYMean, -self.d, fabs(residual), self.sgnd(weightedYMean), self.sgnd(w_y_ik), linearComponent)
                 linexResidualSum += linexResidual
 
             linexVariance = linexResidualSum / (sumOutputKSampleWeights)
             linexVarianceSum += linexVariance
-
 
         linexVarianceAvg = linexVarianceSum / self.n_outputs
         return linexVarianceAvg
@@ -1115,8 +1002,8 @@ cdef class SignMSE(SignRegressionCriterion):
            left child (samples[start:pos]) and the impurity the right child
            (samples[pos:end])."""
 
-        impurity_left[0] = self.computeLinexVariance(self.sum_left, self.signWeightSum_n_node_samples_left, self.samples, self.start, self.pos)
-        impurity_right[0] = self.computeLinexVariance(self.sum_right, self.signWeightSum_n_node_samples_right, self.samples, self.pos, self.end)
+        impurity_left[0] = self.computeLinexVariance(self.sum_left, &self.weighted_n_left, self.samples, self.start, self.pos)
+        impurity_right[0] = self.computeLinexVariance(self.sum_right, &self.weighted_n_right, self.samples, self.pos, self.end)
         printf("SignMSE.children_impurity():impurity_left[0]=%.6f, impurity_right[0]=%.6f\n", impurity_left[0], impurity_right[0])
 
 
