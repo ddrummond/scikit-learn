@@ -171,7 +171,7 @@ cdef class Criterion:
         cdef double impurity_right
         self.children_impurity(&impurity_left, &impurity_right)
         cdef double proxyImpurity = (- self.weighted_n_right * impurity_right - self.weighted_n_left * impurity_left)
-        printf("SignMSE.proxy_impurity_improvement(): proxyImpurity=%.2f, weighted_n_right=%.2f, impurity_right=%.2f, weighted_n_left=%.2f, impurity_left=%.2f   \n", proxyImpurity, self.weighted_n_right, impurity_right, self.weighted_n_left, impurity_left)
+        printf("LinexME.proxy_impurity_improvement(): proxyImpurity=%.2f, weighted_n_right=%.2f, impurity_right=%.2f, weighted_n_left=%.2f, impurity_left=%.2f   \n", proxyImpurity, self.weighted_n_right, impurity_right, self.weighted_n_left, impurity_left)
         return proxyImpurity
 
     cdef double impurity_improvement(self, double impurity) nogil:
@@ -728,8 +728,6 @@ cdef class SignRegressionCriterion(Criterion):
         self.weighted_n_right = 0.0
 
         self.sq_sum_total = 0.0
-        self.d = 4.0   #Exponential Penalty Term
-        self.a = 2.0  #Linear Penalty Term
 
         # Allocate accumulators. Make sure they are NULL, not uninitialized,
         # before an exception can be raised (which triggers __dealloc__).
@@ -764,7 +762,7 @@ cdef class SignRegressionCriterion(Criterion):
 
     cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
                   double weighted_n_samples, SIZE_t* samples, SIZE_t start,
-                  SIZE_t end) nogil except -1:
+                  SIZE_t end, double d=4.0, double a=2.0) nogil except -1:
         """Initialize the criterion at node samples[start:end] and
            children samples[start:start] and samples[start:end]."""
         # Initialize fields
@@ -785,8 +783,8 @@ cdef class SignRegressionCriterion(Criterion):
         cdef DOUBLE_t w = 1.0
 
         self.sq_sum_total = 0.0
-        self.d = 4.0   #Exponential Penalty Term
-        self.a = 2.0  #Linear Penalty Term
+        self.d = d  #Exponential Penalty Term
+        self.a = a  #Linear Penalty Term
         memset(self.sum_total, 0, self.n_outputs * sizeof(double))
         memset(self.signCount_total, 0, self.n_outputs * sizeof(int))
         memset(self.signWeighted_n_node_samples, 0, self.n_outputs * sizeof(double))
@@ -918,8 +916,8 @@ cdef class SignRegressionCriterion(Criterion):
             dest[k] = self.sum_total[k] / self.weighted_n_node_samples
 
 
-cdef class SignMSE(SignRegressionCriterion):
-    """Sign-biased Mean squared error impurity criterion.
+cdef class LinexME(SignRegressionCriterion):
+    """Linex Mean Error impurity criterion.
 
         SMSE = sign_biased_var_left + sign_biased_var_right
     """
@@ -941,7 +939,7 @@ cdef class SignMSE(SignRegressionCriterion):
             the ending index
 
         """
-        printf("SignMSE.computeLinexVariance(weighted_ysum_array[0]=%.2f, weight_sum_array[0]=%.2f, start=%d, end=%d)\n", weighted_ysum_array[0], weight_sum_array[0], start, end)
+        printf("LinexME.computeLinexVariance(weighted_ysum_array[0]=%.2f, weight_sum_array[0]=%.2f, start=%d, end=%d)\n", weighted_ysum_array[0], weight_sum_array[0], start, end)
         cdef double* sample_weight = self.sample_weight
         cdef SIZE_t i
         cdef SIZE_t p
@@ -992,7 +990,7 @@ cdef class SignMSE(SignRegressionCriterion):
     cdef double node_impurity(self) nogil:
         """Evaluate the impurity of the current node, i.e. the impurity of
            samples[start:end]."""
-        printf("SignMSE.node_impurity()\n")
+        printf("LinexME.node_impurity()\n")
         return self.computeLinexVariance(self.sum_total, self.signWeighted_n_node_samples, self.samples, self.start, self.end)
 
 
@@ -1004,7 +1002,7 @@ cdef class SignMSE(SignRegressionCriterion):
 
         impurity_left[0] = self.computeLinexVariance(self.sum_left, &self.weighted_n_left, self.samples, self.start, self.pos)
         impurity_right[0] = self.computeLinexVariance(self.sum_right, &self.weighted_n_right, self.samples, self.pos, self.end)
-        printf("SignMSE.children_impurity():impurity_left[0]=%.6f, impurity_right[0]=%.6f\n", impurity_left[0], impurity_right[0])
+        printf("LinexME.children_impurity():impurity_left[0]=%.6f, impurity_right[0]=%.6f\n", impurity_left[0], impurity_right[0])
 
 
 cdef class RegressionCriterion(Criterion):

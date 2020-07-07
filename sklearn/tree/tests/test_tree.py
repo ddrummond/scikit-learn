@@ -45,7 +45,7 @@ from sklearn import datasets
 from sklearn.utils import compute_sample_weight
 
 CLF_CRITERIONS = ("gini", "entropy")
-REG_CRITERIONS = ("mse", "mae", "friedman_mse", "signmse")
+REG_CRITERIONS = ("mse", "mae", "friedman_mse", "linex_me")
 
 CLF_TREES = {
     "DecisionTreeClassifier": DecisionTreeClassifier,
@@ -101,8 +101,8 @@ y = [-1, -1, -1, 1, 1, 1]
 T = [[-1, -1], [2, 2], [3, 2]]
 true_result = [-1, 1, 1]
 
-# signmse calibrated dataset
-X_signmse_calibrated = np.array([[0.00854282273567331],
+# linexme calibrated dataset
+X_linexme_calibrated = np.array([[0.00854282273567331],
                                 [0.0128207923250652],
                                 [0.0167041140367673],
                                 [0.0197330059951645],
@@ -203,7 +203,7 @@ X_signmse_calibrated = np.array([[0.00854282273567331],
                                 [0.986465353505207],
                                 [0.99981269093974]])
 
-y_signmse_calibrated = [0.021,
+y_linexme_calibrated = [0.021,
                         0.05,
                         0.043,
                         0.07,
@@ -434,7 +434,7 @@ def test_regression_toy():
 def test_signregression_toy():
     # Check regression on a toy dataset.
     for name, Tree in [("DecisionTreeRegressor", DecisionTreeRegressor)]:
-        reg = Tree(criterion="signmse", random_state=1)
+        reg = Tree(criterion="linex_me", random_state=1)
         reg.fit(X, y)
         r = export_text(reg)
         print("=======================================")
@@ -445,87 +445,111 @@ def test_signregression_toy():
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
 
-        clf = Tree(criterion="signmse", max_features=1, random_state=1)
+        clf = Tree(criterion="linex_me", max_features=1, random_state=1)
         clf.fit(X, y)
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
 
-def test_signregression_calibrated_split():
+def test_linexRegression_calibrated_split():
 
-    expectedSignForecasts = [-0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             -0.4862315221,
-                             0.3717357784,
-                             0.3717357784,
-                             0.3717357784,
-                             0.3717357784,
-                             0.3717357784,
-                             0.3717357784,
-                             0.3717357784,
-                             0.3717357784]
-
-    expectedMSEForecasts = [-0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            -0.3337017081,
-                            0.6577162767,
-                            0.6577162767,
-                            0.6577162767,
-                            0.6577162767]
+    #Note that these expected forecasts
+    expectedLinexForecasts = [-0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878, -0.01649878,
+                             -0.01649878, -0.01649878, -0.01649878, -0.01649878,  0.11055556,  0.11055556,
+                              0.11055556,  0.11055556,  0.11055556,  0.11055556,  0.11055556,  0.11055556,
+                              0.11055556,  0.11055556,  0.11055556,  0.11055556,  0.11055556,  0.11055556,
+                              0.11055556,  0.11055556,  0.11055556,  0.11055556]
 
     #Note the expected answers were computed using a spreadsheet based on the DecisionTreeRegressor logic.
     # The ExtraTreeRegressor tree uses totally random splits, so its not a good choice to test the underlying Criterion class
     TEST_TREES = {
         "DecisionTreeRegressor": DecisionTreeRegressor
     }
-    # Confirm that I understand the standard MSE decision tree logic as well.
-    regMSE = DecisionTreeRegressor(criterion="mse", random_state=1, max_depth=1, min_samples_leaf=4)
-    regMSE.fit(X_signmse_calibrated, y_signmse_calibrated)
-    r = export_text(regMSE, show_weights=True)
-    print("=======================================")
-    print("MSE Tree")
-    print("---------------------------------------")
-    print(r)
-    print("=======================================")
-    #assert_almost_equal(regMSE.predict(X_signmse_calibrated), expectedMSEForecasts,
-    #                    err_msg="Tree DecisionTreeRegressor with criterion='mse' failed to match expected result.")
 
     # Check regression on a calibrated dataset.
     for name, Tree in TEST_TREES.items():
-        reg = Tree(criterion="signmse", random_state=1, max_depth=1, min_samples_leaf=4)
-        reg.fit(X_signmse_calibrated, y_signmse_calibrated)
+        reg = Tree(criterion="linex_me", random_state=1, max_depth=1, min_samples_leaf=4)
+        reg.fit(X_linexme_calibrated, y_linexme_calibrated)
         r = export_text(reg, show_weights=True)
         print("=======================================")
-        print("SignMSE {} Tree".format(name))
+        print("LinexME {} Tree".format(name))
         print("---------------------------------------")
         print(r)
         print("=======================================")
-        #assert_almost_equal(reg.predict(X_signmse_calibrated), expectedSignForecasts,
-        #                    err_msg="Tree {0} with criterion='signmse' failed to match expected result.".format(name))
-        #fail if this fit gives you the same result as mse
-        #if np.array_equal(reg.predict(X_signmse_calibrated), regMSE.predict(X_signmse_calibrated)):
-        #    pytest.fail("predictions for signmse and mse should not be the same.")
-        print("Predictions:")
-        print(reg.predict(X_signmse_calibrated))
+        #print("Predictions:")
+        #print(reg.predict(X_linexme_calibrated))
+        assert_almost_equal(reg.predict(X_linexme_calibrated), expectedLinexForecasts,
+                            err_msg="Tree {0} with criterion='linex_me' failed to match expected result.".format(name))
+
+
+def test_linexregression_by_score():
+    TEST_TREES = {
+        "DecisionTreeRegressor": DecisionTreeRegressor
+    }
+    for name, Tree in TEST_TREES.items():
+        linexTree = Tree(criterion="linex_me", random_state=1, max_depth=15, min_samples_leaf=4)
+        linexTree.fit(X_linexme_calibrated, y_linexme_calibrated)
+        linexTreeLossScore = linex_loss_score(linexTree.predict(X_linexme_calibrated), y_linexme_calibrated)
+
+        mseTree = Tree(criterion="mse", random_state=1, max_depth=15, min_samples_leaf=4)
+        mseTree.fit(X_linexme_calibrated, y_linexme_calibrated)
+        mseTreeLossScore = linex_loss_score(mseTree.predict(X_linexme_calibrated), y_linexme_calibrated)
+        print("linexTreeLossScore = {}, mseTreeLossScore = {}".format(linexTreeLossScore, mseTreeLossScore))
+        assert linexTreeLossScore < mseTreeLossScore, "Tree fit with a Linex Criterion should have a lower loss score [{}] than a Tree trained with the MSE criterion [{}].".format(linexScore, mseScore)
+
+def linex_loss_score(y, y_pred, d=4, a=10, sample_weights=None):
+    loss = None
+    if sample_weights is not None:
+        loss = np.sum(linex_loss(y, y_pred, d, a, sample_weights=sample_weights)) / np.sum(sample_weights)
+    else:
+        loss = np.mean(linex_loss(y, y_pred, d, a))
+    return loss
+
+def linex_loss(y, y_pred, d=4, a=10, sample_weights=None):
+    '''
+    d = exponential penalty constant, default = 4
+    a = linear penalty constant, defalt = 10
+    x = residual, y_pred - y_true
+
+    Modified LINEX asymetric loss function to be minimized (smaller values are better):
+
+    loss = exp(-d * abs(x) * if(y_true != 0, sign(y_true), 1) * IF(y_pred != 0, sign(y_pred), 1)) + abs(a * x) - 1
+
+    :param y:
+    :param y_pred:
+    :return:
+    '''
+    if d < 0 or a < 0:
+        raise ValueError("Arguments d and a must both be positive.")
+    # residuals
+    x = y_pred - y
+    y_true_sign = np.sign(y)
+    y_true_sign = np.where(y_true_sign == 0, 1, y_true_sign)
+    y_pred_sign = np.sign(y_pred)
+    y_pred_sign = np.where(y_pred_sign == 0, 1, y_pred_sign)
+    linex = np.exp(-d * np.abs(x) * y_true_sign * y_pred_sign) + np.abs(a * x) - 1
+
+    if sample_weights is not None:
+        linex = linex * sample_weights
+
+    '''
+    print("linex, y_true, y_pred")
+    for i in range(0,len(y_pred)):
+        print("{}, {}, {}".format(linex[i], y_true[i], y_pred[i]))
+    print("Done printing linex")
+    '''
+    return linex
 
 #Testing Ideas:
 # 1. get the first level split predictions and test those
