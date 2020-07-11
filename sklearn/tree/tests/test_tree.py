@@ -16,6 +16,7 @@ from sklearn.random_projection import _sparse_random_matrix
 
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_linex_error
 
 from sklearn.utils._testing import assert_allclose
 from sklearn.utils._testing import assert_array_equal
@@ -500,60 +501,18 @@ def test_linexregression_by_score():
     for name, Tree in TEST_TREES.items():
         linexTree = Tree(criterion="linex_me", random_state=1, max_depth=15, min_samples_leaf=4)
         linexTree.fit(X_linexme_calibrated, y_linexme_calibrated)
-        linexTreeLossScore = linex_loss_score(linexTree.predict(X_linexme_calibrated), y_linexme_calibrated)
+        linexTreeLossScore = mean_linex_error(linexTree.predict(X_linexme_calibrated), y_linexme_calibrated)
 
         mseTree = Tree(criterion="mse", random_state=1, max_depth=15, min_samples_leaf=4)
         mseTree.fit(X_linexme_calibrated, y_linexme_calibrated)
-        mseTreeLossScore = linex_loss_score(mseTree.predict(X_linexme_calibrated), y_linexme_calibrated)
+
+        mseTreeLossScore = mean_linex_error(mseTree.predict(X_linexme_calibrated), y_linexme_calibrated)
         print("linexTreeLossScore = {}, mseTreeLossScore = {}".format(linexTreeLossScore, mseTreeLossScore))
         assert linexTreeLossScore < mseTreeLossScore, "Tree fit with a Linex Criterion should have a lower loss score [{}] than a Tree trained with the MSE criterion [{}].".format(linexScore, mseScore)
 
-def linex_loss_score(y, y_pred, d=4, a=10, sample_weights=None):
-    loss = None
-    if sample_weights is not None:
-        loss = np.sum(linex_loss(y, y_pred, d, a, sample_weights=sample_weights)) / np.sum(sample_weights)
-    else:
-        loss = np.mean(linex_loss(y, y_pred, d, a))
-    return loss
-
-def linex_loss(y, y_pred, d=4, a=10, sample_weights=None):
-    '''
-    d = exponential penalty constant, default = 4
-    a = linear penalty constant, defalt = 10
-    x = residual, y_pred - y_true
-
-    Modified LINEX asymetric loss function to be minimized (smaller values are better):
-
-    loss = exp(-d * abs(x) * if(y_true != 0, sign(y_true), 1) * IF(y_pred != 0, sign(y_pred), 1)) + abs(a * x) - 1
-
-    :param y:
-    :param y_pred:
-    :return:
-    '''
-    if d < 0 or a < 0:
-        raise ValueError("Arguments d and a must both be positive.")
-    # residuals
-    x = y_pred - y
-    y_true_sign = np.sign(y)
-    y_true_sign = np.where(y_true_sign == 0, 1, y_true_sign)
-    y_pred_sign = np.sign(y_pred)
-    y_pred_sign = np.where(y_pred_sign == 0, 1, y_pred_sign)
-    linex = np.exp(-d * np.abs(x) * y_true_sign * y_pred_sign) + np.abs(a * x) - 1
-
-    if sample_weights is not None:
-        linex = linex * sample_weights
-
-    '''
-    print("linex, y_true, y_pred")
-    for i in range(0,len(y_pred)):
-        print("{}, {}, {}".format(linex[i], y_true[i], y_pred[i]))
-    print("Done printing linex")
-    '''
-    return linex
-
 #Testing Ideas:
-# 1. get the first level split predictions and test those
-# 4. Add a test that uses the Linex model scorer.  Use the linex scorer to show that the linex tree gets a better score than the MSE or MAD tree
+# 1. X get the first level split predictions and test those
+# 4. X Add a test that uses the Linex model scorer.  Use the linex scorer to show that the linex tree gets a better score than the MSE or MAD tree
 # 2. pull the code out of the tree that instantiates _criterion and calls SignMSE.proxy_impurity_improvement(), compare that method's results with the spreadsheet results.
 # 3. add a test just for linex utility method.
 

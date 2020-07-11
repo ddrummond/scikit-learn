@@ -20,6 +20,7 @@ the lower the better
 #          Michael Eickenberg <michael.eickenberg@gmail.com>
 #          Konstantin Shmelkov <konstantin.shmelkov@polytechnique.edu>
 #          Christian Lorentzen <lorentzen.ch@googlemail.com>
+#          Daren Drummond <daren.drummondcc@gmail.com>
 # License: BSD 3 clause
 
 import numpy as np
@@ -38,6 +39,7 @@ __ALL__ = [
     "mean_absolute_error",
     "mean_squared_error",
     "mean_squared_log_error",
+    "mean_linex_error",
     "median_absolute_error",
     "r2_score",
     "explained_variance_score",
@@ -188,6 +190,122 @@ def mean_absolute_error(y_true, y_pred, *,
             multioutput = None
 
     return np.average(output_errors, weights=multioutput)
+
+@_deprecate_positional_args
+def mean_linex_error(y_true, y_pred, d=4, a=10, sample_weight=None, multioutput='uniform_average'):
+    """Mean LINEX error regression loss
+
+    Modified LINEX asymetric loss function to be minimized (smaller values are better):
+
+    Given Parameters:
+    d = exponential penalty constant, default = 4
+    a = linear penalty constant, defalt = 10
+    x = residual, y_pred - y_true
+
+    Then loss is computed as:
+
+    loss = exp(-d * abs(x) * if(y_true != 0, sign(y_true), 1) * IF(y_pred != 0, sign(y_pred), 1)) + abs(a * x) - 1
+
+     Parameters
+     ----------
+     y_true : array-like of shape (n_samples,) or (n_samples, n_outputs)
+         Ground truth (correct) target values.
+
+     y_pred : array-like of shape (n_samples,) or (n_samples, n_outputs)
+         Estimated target values.
+
+     d: exponential penalty constant, default = 4
+
+     a: linear penalty constant, defalt = 10
+
+     sample_weight : array-like of shape (n_samples,), optional
+         Sample weights.
+
+     multioutput : string in ['raw_values', 'uniform_average'] \
+                 or array-like of shape (n_outputs)
+         Defines aggregating of multiple output values.
+         Array-like value defines weights used to average errors.
+
+         'raw_values' :
+             Returns a full set of errors in case of multioutput input.
+
+         'uniform_average' :
+             Errors of all outputs are averaged with uniform weight.
+
+
+     Returns
+     -------
+     loss : float or ndarray of floats
+         If multioutput is 'raw_values', then mean absolute error is returned
+         for each output separately.
+         If multioutput is 'uniform_average' or an ndarray of weights, then the
+         weighted average of all output errors is returned.
+
+         MAE output is non-negative floating point. The best value is 0.0.
+
+     Examples
+     --------
+     >>> from sklearn.metrics import mean_linex_error
+     >>> y_true = [3, -0.5, 2, 7]
+     >>> y_pred = [2.5, 0.0, 2, 8]
+     >>> mean_linex_error(y_true, y_pred)
+     0.5
+     >>> y_true = [[0.5, 1], [-1, 1], [7, -6]]
+     >>> y_pred = [[0, 2], [-1, 2], [8, -5]]
+     >>> mean_linex_error(y_true, y_pred)
+     0.75
+     >>> mean_linex_error(y_true, y_pred, multioutput='raw_values')
+     array([0.5, 1. ])
+     """
+    check_consistent_length(y_true, y_pred, sample_weight)
+
+    #output_errors = np.sum(_linex_loss(y_true, y_pred, d, a, sample_weights=sample_weight)) / np.sum(sample_weight)
+    output_errors = np.average(_linex_loss(y_true, y_pred, d, a, sample_weight=sample_weight), weights=sample_weight, axis=0)
+
+    if isinstance(multioutput, str):
+        if multioutput == 'raw_values':
+            return output_errors
+        elif multioutput == 'uniform_average':
+            # pass None as weights to np.average: uniform mean
+            multioutput = None
+
+    return np.average(output_errors, weights=multioutput)
+
+
+def _linex_loss(y_true, y_pred, d=4, a=10, sample_weight=None):
+    '''
+    d = exponential penalty constant, default = 4
+    a = linear penalty constant, defalt = 10
+    x = residual, y_pred - y_true
+
+    Modified LINEX asymetric loss function to be minimized (smaller values are better):
+
+    loss = exp(-d * abs(x) * if(y_true != 0, sign(y_true), 1) * IF(y_pred != 0, sign(y_pred), 1)) + abs(a * x) - 1
+
+    :param y_true:
+    :param y_pred:
+    :return:
+    '''
+    if d < 0 or a < 0:
+        raise ValueError("Arguments d and a must both be positive.")
+    # residuals
+    x = y_pred - y_true
+    y_true_sign = np.sign(y_true)
+    y_true_sign = np.where(y_true_sign == 0, 1, y_true_sign)
+    y_pred_sign = np.sign(y_pred)
+    y_pred_sign = np.where(y_pred_sign == 0, 1, y_pred_sign)
+    linex = np.exp(-d * np.abs(x) * y_true_sign * y_pred_sign) + np.abs(a * x) - 1
+
+    if sample_weight is not None:
+        linex = linex * sample_weight
+
+    '''
+    print("linex, y_true, y_pred")
+    for i in range(0,len(y_pred)):
+        print("{}, {}, {}".format(linex[i], y_true[i], y_pred[i]))
+    print("Done printing linex")
+    '''
+    return linex
 
 
 @_deprecate_positional_args

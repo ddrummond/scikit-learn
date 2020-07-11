@@ -171,7 +171,7 @@ cdef class Criterion:
         cdef double impurity_right
         self.children_impurity(&impurity_left, &impurity_right)
         cdef double proxyImpurity = (- self.weighted_n_right * impurity_right - self.weighted_n_left * impurity_left)
-        printf("LinexME.proxy_impurity_improvement(): proxyImpurity=%.2f, weighted_n_right=%.2f, impurity_right=%.2f, weighted_n_left=%.2f, impurity_left=%.2f   \n", proxyImpurity, self.weighted_n_right, impurity_right, self.weighted_n_left, impurity_left)
+        #printf("LinexME.proxy_impurity_improvement(): proxyImpurity=%.2f, weighted_n_right=%.2f, impurity_right=%.2f, weighted_n_left=%.2f, impurity_left=%.2f   \n", proxyImpurity, self.weighted_n_right, impurity_right, self.weighted_n_left, impurity_left)
         return proxyImpurity
 
     cdef double impurity_improvement(self, double impurity) nogil:
@@ -715,8 +715,8 @@ cdef class SignRegressionCriterion(Criterion):
         self.pos = 0
         self.end = 0
 
-        if n_outputs > 1:
-            raise ValueError("SignRegressionCriterion only supports a single output dimension today.")
+        #if n_outputs > 1:
+        #    raise ValueError("SignRegressionCriterion only supports a single output dimension today.")
 
         self.n_outputs = n_outputs
         self.n_samples = n_samples

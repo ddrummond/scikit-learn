@@ -63,6 +63,7 @@ from ._regression import max_error
 from ._regression import mean_absolute_error
 from ._regression import mean_squared_error
 from ._regression import mean_squared_log_error
+from ._regression import mean_linex_error
 from ._regression import median_absolute_error
 from ._regression import r2_score
 from ._regression import mean_tweedie_deviance
@@ -124,6 +125,7 @@ __all__ = [
     'mean_absolute_error',
     'mean_squared_error',
     'mean_squared_log_error',
+    'mean_linex_error',
     'mean_poisson_deviance',
     'mean_gamma_deviance',
     'mean_tweedie_deviance',
