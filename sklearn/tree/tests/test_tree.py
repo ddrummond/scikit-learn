@@ -46,7 +46,7 @@ from sklearn import datasets
 from sklearn.utils import compute_sample_weight
 
 CLF_CRITERIONS = ("gini", "entropy")
-REG_CRITERIONS = ("mse", "mae", "friedman_mse", "linex_me")
+REG_CRITERIONS = ("mse", "mae", "friedman_mse", "mle")
 
 CLF_TREES = {
     "DecisionTreeClassifier": DecisionTreeClassifier,
@@ -419,13 +419,16 @@ def test_regression_toy():
         reg = Tree(random_state=1)
         reg.fit(X, y)
         r = export_text(reg)
+        '''
         print("=======================================")
         print("MSE {} Tree".format(name))
         print("---------------------------------------")
         print(r)
         print("=======================================")
+        '''
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
+
 
         clf = Tree(max_features=1, random_state=1)
         clf.fit(X, y)
@@ -435,18 +438,20 @@ def test_regression_toy():
 def test_signregression_toy():
     # Check regression on a toy dataset.
     for name, Tree in [("DecisionTreeRegressor", DecisionTreeRegressor)]:
-        reg = Tree(criterion="linex_me", random_state=1)
+        reg = Tree(criterion="mle", random_state=1)
         reg.fit(X, y)
         r = export_text(reg)
+        '''
         print("=======================================")
         print("SignMSE {} Tree".format(name))
         print("---------------------------------------")
         print(r)
         print("=======================================")
+        '''
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
 
-        clf = Tree(criterion="linex_me", max_features=1, random_state=1)
+        clf = Tree(criterion="mle", max_features=1, random_state=1)
         clf.fit(X, y)
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
@@ -480,9 +485,10 @@ def test_linexRegression_calibrated_split():
 
     # Check regression on a calibrated dataset.
     for name, Tree in TEST_TREES.items():
-        reg = Tree(criterion="linex_me", random_state=1, max_depth=1, min_samples_leaf=4)
+        reg = Tree(criterion="mle", random_state=1, max_depth=1, min_samples_leaf=4)
         reg.fit(X_linexme_calibrated, y_linexme_calibrated)
         r = export_text(reg, show_weights=True)
+        '''
         print("=======================================")
         print("LinexME {} Tree".format(name))
         print("---------------------------------------")
@@ -490,25 +496,21 @@ def test_linexRegression_calibrated_split():
         print("=======================================")
         #print("Predictions:")
         #print(reg.predict(X_linexme_calibrated))
+        '''
         assert_almost_equal(reg.predict(X_linexme_calibrated), expectedLinexForecasts,
-                            err_msg="Tree {0} with criterion='linex_me' failed to match expected result.".format(name))
+                            err_msg="Tree {0} with criterion='mle' failed to match expected result.".format(name))
 
 
 def test_linexregression_by_score():
-    TEST_TREES = {
-        "DecisionTreeRegressor": DecisionTreeRegressor
-    }
-    for name, Tree in TEST_TREES.items():
-        linexTree = Tree(criterion="linex_me", random_state=1, max_depth=15, min_samples_leaf=4)
-        linexTree.fit(X_linexme_calibrated, y_linexme_calibrated)
-        linexTreeLossScore = mean_linex_error(linexTree.predict(X_linexme_calibrated), y_linexme_calibrated)
-
-        mseTree = Tree(criterion="mse", random_state=1, max_depth=15, min_samples_leaf=4)
-        mseTree.fit(X_linexme_calibrated, y_linexme_calibrated)
-
-        mseTreeLossScore = mean_linex_error(mseTree.predict(X_linexme_calibrated), y_linexme_calibrated)
-        print("linexTreeLossScore = {}, mseTreeLossScore = {}".format(linexTreeLossScore, mseTreeLossScore))
-        assert linexTreeLossScore < mseTreeLossScore, "Tree fit with a Linex Criterion should have a lower loss score [{}] than a Tree trained with the MSE criterion [{}].".format(linexScore, mseScore)
+    linexTree = DecisionTreeRegressor(criterion="mle", random_state=1, max_depth=15, min_samples_leaf=4)
+    linexTree.fit(X_linexme_calibrated, y_linexme_calibrated)
+    linexTreeLossScore = mean_linex_error(linexTree.predict(X_linexme_calibrated), y_linexme_calibrated)
+    mseTree = DecisionTreeRegressor(criterion="mse", random_state=1, max_depth=15, min_samples_leaf=4)
+    mseTree.fit(X_linexme_calibrated, y_linexme_calibrated)
+    mseTreeLossScore = mean_linex_error(mseTree.predict(X_linexme_calibrated), y_linexme_calibrated)
+    #print("linexTreeLossScore = {}, mseTreeLossScore = {}".format(linexTreeLossScore, mseTreeLossScore))
+    assert linexTreeLossScore < mseTreeLossScore, "Tree fit with a Linex Criterion should have a lower loss score [{}] than a Tree trained with the MSE criterion [{}].".format(linexTreeLossScore, mseTreeLossScore)
+    assert_almost_equal(linexTreeLossScore, 1.1536735)
 
 #Testing Ideas:
 # 1. X get the first level split predictions and test those

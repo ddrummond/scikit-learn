@@ -789,7 +789,7 @@ cdef class SignRegressionCriterion(Criterion):
         memset(self.signCount_total, 0, self.n_outputs * sizeof(int))
         memset(self.signWeighted_n_node_samples, 0, self.n_outputs * sizeof(double))
 
-        printf("SignRegressionCriterion.init(): start=%d, end=%d \n", start, end)
+        #printf("SignRegressionCriterion.init(): start=%d, end=%d \n", start, end)
 
         for p in range(start, end):
             i = samples[p]
@@ -810,7 +810,7 @@ cdef class SignRegressionCriterion(Criterion):
         return 0
 
     cdef int reset(self) nogil except -1:
-        printf("SignRegressionCriterion.reset()\n")
+        #printf("SignRegressionCriterion.reset()\n")
         """Reset the criterion at pos=start."""
         #Note that the SignRegressionCriterion.update() method recomputes left and right stats fully on each call,
         cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
@@ -824,7 +824,7 @@ cdef class SignRegressionCriterion(Criterion):
         return 0
 
     cdef int reverse_reset(self) nogil except -1:
-        printf("SignRegressionCriterion.reverse_reset()")
+        #printf("SignRegressionCriterion.reverse_reset()")
         """Reset the criterion at pos=end."""
         #Note that the SignRegressionCriterion.update() method recomputes left and right stats fully on each call,
         cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
@@ -842,7 +842,7 @@ cdef class SignRegressionCriterion(Criterion):
 
     cdef int update(self, SIZE_t new_pos) nogil except -1:
         """Updated statistics by moving samples[pos:new_pos] to the left."""
-        printf("SignRegressionCriterion.update(new_pos=%d)\n", new_pos)
+        #printf("SignRegressionCriterion.update(new_pos=%d)\n", new_pos)
         cdef double* sum_left = self.sum_left
         cdef double* sum_right = self.sum_right
         cdef double* sum_total = self.sum_total
@@ -908,7 +908,7 @@ cdef class SignRegressionCriterion(Criterion):
 
     cdef void node_value(self, double* dest) nogil:
         """Compute the node value of samples[start:end] into dest.  NOTE: This is the weighted average of the y value."""
-        printf("SignRegressionCriterion.node_value()\n")
+        #printf("SignRegressionCriterion.node_value()\n")
 
         cdef SIZE_t k
 
@@ -939,7 +939,7 @@ cdef class LinexME(SignRegressionCriterion):
             the ending index
 
         """
-        printf("LinexME.computeLinexVariance(weighted_ysum_array[0]=%.2f, weight_sum_array[0]=%.2f, start=%d, end=%d)\n", weighted_ysum_array[0], weight_sum_array[0], start, end)
+        #printf("LinexME.computeLinexVariance(weighted_ysum_array[0]=%.2f, weight_sum_array[0]=%.2f, start=%d, end=%d)\n", weighted_ysum_array[0], weight_sum_array[0], start, end)
         cdef double* sample_weight = self.sample_weight
         cdef SIZE_t i
         cdef SIZE_t p
@@ -990,7 +990,7 @@ cdef class LinexME(SignRegressionCriterion):
     cdef double node_impurity(self) nogil:
         """Evaluate the impurity of the current node, i.e. the impurity of
            samples[start:end]."""
-        printf("LinexME.node_impurity()\n")
+        #printf("LinexME.node_impurity()\n")
         return self.computeLinexVariance(self.sum_total, self.signWeighted_n_node_samples, self.samples, self.start, self.end)
 
 
@@ -1002,7 +1002,7 @@ cdef class LinexME(SignRegressionCriterion):
 
         impurity_left[0] = self.computeLinexVariance(self.sum_left, &self.weighted_n_left, self.samples, self.start, self.pos)
         impurity_right[0] = self.computeLinexVariance(self.sum_right, &self.weighted_n_right, self.samples, self.pos, self.end)
-        printf("LinexME.children_impurity():impurity_left[0]=%.6f, impurity_right[0]=%.6f\n", impurity_left[0], impurity_right[0])
+        #printf("LinexME.children_impurity():impurity_left[0]=%.6f, impurity_right[0]=%.6f\n", impurity_left[0], impurity_right[0])
 
 
 cdef class RegressionCriterion(Criterion):
