@@ -305,6 +305,107 @@ y_linexme_calibrated = [0.021,
                         0.0672,
                         0.035]
 
+y_linexme_weights = [   1.15446692468813,
+                        1.21511906546047,
+                        1.26368474987775,
+                        1.29812142712428,
+                        1.34906946698628,
+                        1.48084017270544,
+                        1.56987577333019,
+                        1.61510697524356,
+                        1.65008001798485,
+                        1.6533267134396,
+                        1.72766832060704,
+                        1.75320950582265,
+                        1.79072134723583,
+                        1.81404155085904,
+                        1.8221718029077,
+                        1.85340670015138,
+                        1.86719017515026,
+                        1.88872673766151,
+                        1.89284924162508,
+                        1.93818207838679,
+                        1.96051269206735,
+                        1.96221450712251,
+                        1.97290084193928,
+                        1.99916728960155,
+                        2.02410585163331,
+                        2.04100373922075,
+                        2.09327788507931,
+                        2.09838976398704,
+                        2.12181373137721,
+                        2.12589127641982,
+                        2.13730998348709,
+                        2.14747778383885,
+                        2.17163755578553,
+                        2.17386315615507,
+                        2.20451327743756,
+                        2.21003477238278,
+                        2.21317768626208,
+                        2.21320271869678,
+                        2.21435236161686,
+                        2.2193079182148,
+                        2.2251559339722,
+                        2.23325174664212,
+                        2.23569148017282,
+                        2.25781886056089,
+                        2.26070296270124,
+                        2.26938192117016,
+                        2.27246332448143,
+                        2.27281417537247,
+                        2.28206570351624,
+                        2.30840829557688,
+                        2.3175489923954,
+                        2.33001169965669,
+                        2.3413920568046,
+                        2.34461646982203,
+                        2.3661991417685,
+                        2.38196989852925,
+                        2.39020155324583,
+                        2.39673073431191,
+                        2.41207303803497,
+                        2.43127517865662,
+                        2.47074126034848,
+                        2.47430302450477,
+                        2.4899835426068,
+                        2.5111691300586,
+                        2.51662761582237,
+                        2.52180976311131,
+                        2.53540440882471,
+                        2.55080127733327,
+                        2.55333826724401,
+                        2.57460810432362,
+                        2.57559764043396,
+                        2.57769807134942,
+                        2.58303365423836,
+                        2.58560812718442,
+                        2.58873972748012,
+                        2.58893631657949,
+                        2.59172799337824,
+                        2.59269202696951,
+                        2.59487603640804,
+                        2.59650515053419,
+                        2.60318606279469,
+                        2.60623369234875,
+                        2.60683607920694,
+                        2.60840118866216,
+                        2.62308103244226,
+                        2.62649561213128,
+                        2.63430693038425,
+                        2.63754556532422,
+                        2.64045138898214,
+                        2.65523217582827,
+                        2.66553604715826,
+                        2.66968728919036,
+                        2.67778428762537,
+                        2.68217692001888,
+                        2.68331276528147,
+                        2.68536407358227,
+                        2.69120836299787,
+                        2.69925055897483,
+                        2.70176883369434,
+                        2.70749041652798]
+
 
 # also load the iris dataset
 # and randomly permute it
@@ -418,17 +519,8 @@ def test_regression_toy():
     for name, Tree in REG_TREES.items():
         reg = Tree(random_state=1)
         reg.fit(X, y)
-        r = export_text(reg)
-        '''
-        print("=======================================")
-        print("MSE {} Tree".format(name))
-        print("---------------------------------------")
-        print(r)
-        print("=======================================")
-        '''
         assert_almost_equal(reg.predict(T), true_result,
                             err_msg="Failed with {0}".format(name))
-
 
         clf = Tree(max_features=1, random_state=1)
         clf.fit(X, y)
@@ -510,19 +602,7 @@ def test_linexregression_by_score():
     mseTreeLossScore = mean_linex_error(mseTree.predict(X_linexme_calibrated), y_linexme_calibrated)
     #print("linexTreeLossScore = {}, mseTreeLossScore = {}".format(linexTreeLossScore, mseTreeLossScore))
     assert linexTreeLossScore < mseTreeLossScore, "Tree fit with a Linex Criterion should have a lower loss score [{}] than a Tree trained with the MSE criterion [{}].".format(linexTreeLossScore, mseTreeLossScore)
-    assert_almost_equal(linexTreeLossScore, 1.1536735)
-
-#Testing Ideas:
-# 1. X get the first level split predictions and test those
-# 4. X Add a test that uses the Linex model scorer.  Use the linex scorer to show that the linex tree gets a better score than the MSE or MAD tree
-# 2. pull the code out of the tree that instantiates _criterion and calls SignMSE.proxy_impurity_improvement(), compare that method's results with the spreadsheet results.
-# 3. add a test just for linex utility method.
-
-#TODOs:
-# 1. Parameterize constants d and a
-# 2. Rename the criterion to LinexMeanError (LME) instead of SignMSE
-# 3. Test Tree in the main project
-# 4. Implement and test a Median version of the Linex Criterion (LMAD)
+    assert_almost_equal(linexTreeLossScore, 2.153673539)
 
 
 def test_xor():

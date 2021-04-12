@@ -294,7 +294,7 @@ def _linex_loss(y_true, y_pred, d=4, a=10, sample_weight=None):
     y_true_sign = np.where(y_true_sign == 0, 1, y_true_sign)
     y_pred_sign = np.sign(y_pred)
     y_pred_sign = np.where(y_pred_sign == 0, 1, y_pred_sign)
-    linex = np.exp(-d * np.abs(x) * y_true_sign * y_pred_sign) + np.abs(a * x) - 1
+    linex = np.exp(-d * np.abs(x) * y_true_sign * y_pred_sign) + np.abs(a * x)
 
     if sample_weight is not None:
         linex = linex * sample_weight

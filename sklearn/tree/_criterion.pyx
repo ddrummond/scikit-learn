@@ -13,6 +13,7 @@
 #          Fares Hedayati <fares.hedayati@gmail.com>
 #          Jacob Schreiber <jmschreiber91@gmail.com>
 #          Nelson Liu <nelson@nelsonliu.me>
+#          Daren Drummond <daren.drummondcc@gmail.com>
 #
 # License: BSD 3 clause
 
@@ -946,8 +947,7 @@ cdef class LinexME(SignRegressionCriterion):
         cdef SIZE_t k
         cdef DOUBLE_t w = 1.0
         cdef DOUBLE_t y_ik = 0.0
-        cdef DOUBLE_t w_y_ik = 0.0
-        cdef DOUBLE_t sumOutputKSampleWeights
+        cdef DOUBLE_t sumOutputSampleWeights
         cdef DOUBLE_t linexResidualSum = 0.0
         cdef double residual = 0.0
         cdef DOUBLE_t linexVariance = 0.0
@@ -961,7 +961,7 @@ cdef class LinexME(SignRegressionCriterion):
         for k in range(self.n_outputs):
             weightedYMean = weighted_ysum_array[k] / weight_sum_array[k]
             linexResidualSum = 0.0
-            sumOutputKSampleWeights = 0.0
+            sumOutputSampleWeights = 0.0
             w = 1.0
 
             for p in range(start, end):
@@ -971,16 +971,13 @@ cdef class LinexME(SignRegressionCriterion):
                     w = sample_weight[i]
 
                 y_ik = self.y[i, k]
-                w_y_ik = w * y_ik
-                sumOutputKSampleWeights += w
-                residual = w_y_ik - weightedYMean
+                sumOutputSampleWeights += w
+                residual = y_ik - weightedYMean
+                linexResidual = exp(-self.d * fabs(residual) * self.sgnd(weightedYMean) * self.sgnd(y_ik)) + fabs(self.a * residual)
+                #printf("linexResidual=%.6f, w=%.6f, y_ik=%.6f, weightedYMean=%.6f, -self.d=%.6f, fabs(residual)=%.6f, self.sgnd(weightedYMean)=%.1f, self.sgnd(y_ik)=%.1f linearComponent=%.6f \n", linexResidual, w, y_ik, weightedYMean, -self.d, fabs(residual), self.sgnd(weightedYMean), self.sgnd(y_ik), fabs(self.a * residual))
+                linexResidualSum += (w * linexResidual)
 
-                linexResidual = exp(-self.d * fabs(residual) * self.sgnd(weightedYMean) * self.sgnd(w_y_ik)) + fabs(self.a * residual) - const_one
-                #linearComponent = fabs(self.a * residual) - const_one
-                #printf("linexResidual=%.6f, w_y_ik=%.6f, weightedYMean=%.6f, -self.d=%.6f, fabs(residual)=%.6f, self.sgnd(weightedYMean)=%.1f, self.sgnd(w_y_ik)=%.1f linearComponent=%.6f \n", linexResidual, w_y_ik, weightedYMean, -self.d, fabs(residual), self.sgnd(weightedYMean), self.sgnd(w_y_ik), linearComponent)
-                linexResidualSum += linexResidual
-
-            linexVariance = linexResidualSum / (sumOutputKSampleWeights)
+            linexVariance = linexResidualSum / (sumOutputSampleWeights)
             linexVarianceSum += linexVariance
 
         linexVarianceAvg = linexVarianceSum / self.n_outputs
@@ -990,8 +987,11 @@ cdef class LinexME(SignRegressionCriterion):
     cdef double node_impurity(self) nogil:
         """Evaluate the impurity of the current node, i.e. the impurity of
            samples[start:end]."""
-        #printf("LinexME.node_impurity()\n")
-        return self.computeLinexVariance(self.sum_total, self.signWeighted_n_node_samples, self.samples, self.start, self.end)
+        cdef DOUBLE_t linexVariance = 0.0
+        linexVariance = self.computeLinexVariance(self.sum_total, &self.weighted_n_node_samples, self.samples, self.start, self.end)
+        #printf("LinexME.node_impurity(): linexVariance=%.6f\n", linexVariance)
+        #printf("LinexME.node_impurity(): (sum_total[0]=%.2f, weighted_n_node_samples[0]=%.2f, start=%d, end=%d)\n", self.sum_total[0], &self.weighted_n_node_samples[0], self.start, self.end)
+        return linexVariance
 
 
     cdef void children_impurity(self, double* impurity_left,
